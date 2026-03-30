@@ -1,0 +1,14 @@
+[project]
+name = "demo-project-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]",
+    "pyjwt",
+    "pwdlib[argon2]",
+    "sqlmodel",
+    "psycopg[binary]",
+]
+
+[tool.fastapi]
+entrypoint = "src.main:app"
