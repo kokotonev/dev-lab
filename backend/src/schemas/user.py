@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
+
+from src.schemas import BaseOutSchema
 
 
 class UserCreate(BaseModel):
@@ -6,7 +8,7 @@ class UserCreate(BaseModel):
     password: str
 
 
-class UserOut(BaseModel):
+class UserOut(BaseOutSchema):
     id: int
     email: EmailStr
     username: str | None = None

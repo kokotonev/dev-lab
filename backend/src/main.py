@@ -1,6 +1,8 @@
 from  fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.routers import authentication
+
 app = FastAPI(
     title="FastAPI backend for my demo project",
     summary="This is a simple FastAPI backend for demonstration purposes.",
@@ -24,6 +26,8 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+app.include_router(authentication.router)
 
 @app.get("/liveness")
 async def liveness() -> dict[str, str]:
