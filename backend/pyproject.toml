@@ -8,6 +8,7 @@ dependencies = [
     "pwdlib[argon2]",
     "sqlmodel",
     "psycopg[binary]",
+    "alembic",
 ]
 
 [tool.fastapi]
