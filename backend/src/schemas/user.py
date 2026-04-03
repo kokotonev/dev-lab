@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr
 
 from src.schemas import BaseOutSchema
 
@@ -12,3 +12,8 @@ class UserOut(BaseOutSchema):
     id: int
     email: EmailStr
     username: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str

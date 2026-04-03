@@ -1,7 +1,13 @@
-from  fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.routers import authentication
+from src.services.exceptions import TokenValidationError
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="FastAPI backend for my demo project",
@@ -26,6 +32,13 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+@app.exception_handler(TokenValidationError)
+async def token_validation_error_handler(request: Request, exc: TokenValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content={"detail": str(exc)}
+    )
 
 app.include_router(authentication.router)
 

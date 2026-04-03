@@ -3,6 +3,10 @@ import logging
 from pwdlib import PasswordHash
 from datetime import datetime, timedelta, timezone
 
+from fastapi import Request
+
+from src.services.exceptions import TokenValidationError
+
 logger = logging.getLogger(__name__)
 
 password_hash = PasswordHash.recommended()
@@ -36,3 +40,32 @@ def create_access_token(data: dict, expiry: int | None = None) -> str:
 
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def decode_access_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token has expired")
+        return None
+    except jwt.InvalidTokenError:
+        logger.warning("Invalid token")
+        return None
+
+
+def token_required(request: Request) -> dict | None:
+    """Utility function to extract and validate the access token from the request cookies."""
+    token = request.cookies.get("access_token")
+    
+    if not token:
+        logger.info("No access token found in cookies")
+        raise TokenValidationError("No access token found in cookies.")
+
+    token_payload = decode_access_token(token)
+
+    if not token_payload:
+        logger.info("Invalid or expired access token")
+        raise TokenValidationError("Invalid or expired access token")
+
+    return token_payload

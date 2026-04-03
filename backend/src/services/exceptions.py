@@ -1,2 +1,5 @@
-class UserAlreadyExsistsError(Exception):
+class UserAlreadyExistsError(Exception):
+    pass
+
+class TokenValidationError(Exception):
     pass

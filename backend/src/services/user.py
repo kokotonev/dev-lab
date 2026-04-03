@@ -2,10 +2,10 @@ import logging
 from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 
-from src.models.user import User
+from src.models.user import User, UserCredential
 from src.schemas.user import UserOut, UserCreate
 from src.services.auth import hash_password, verify_password, DUMMY_HASH
-from src.services.exceptions import UserAlreadyExsistsError
+from src.services.exceptions import UserAlreadyExistsError
 
 logger = logging.getLogger(__name__)
 
@@ -29,57 +29,59 @@ def get_user(db_session: Session, user_id: int | None = None, email: str | None 
 
 
 def create_user(db_session: Session, user_data: UserCreate) -> UserOut:
-    """Create a new user in the database."""
+    """Create a new user with a local (email/password) credential."""
 
-    hashed_password = hash_password(user_data.password)
-
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password
-    )
+    new_user = User(email=user_data.email)
     try:
         db_session.add(new_user)
-        db_session.commit()
-    
+        db_session.flush()  # Persist to get the generated ID without committing yet
+
     except IntegrityError as e:
         db_session.rollback()
-        
+
         if "email" in str(e.orig):
             logger.warning(f"Attempt to create user with existing email {user_data.email}")
-            raise UserAlreadyExsistsError(f"A user with this email already exists - {user_data.email}") from e
-        
+            raise UserAlreadyExistsError(f"A user with this email already exists - {user_data.email}") from e
+
         logger.error(f"Unexpected IntegrityError creating user {user_data.email}: {e}")
         raise
-    
+
+    credential = UserCredential(
+        user_id=new_user.id,
+        provider="local",
+        password_hash=hash_password(user_data.password),
+    )
+    db_session.add(credential)
+    db_session.commit()
     db_session.refresh(new_user)
 
     return UserOut.model_validate(new_user)
 
 
 def authenticate_user(db_session: Session, email: str, password: str) -> UserOut | None:
-    """Authenticate a user with the given email and password."""
-    # Placeholder for actual authentication logic
-    user: UserOut | None = get_user(db_session, email=email)
-        
+    """Authenticate a user by email and password. Returns the user if credentials are valid."""
+
+    user = db_session.exec(select(User).where(User.email == email)).first()
+
     if not user:
         logger.warning(f"Authentication failed for email {email}: user not found")
-        verify_password(password, DUMMY_HASH)  # To prevent timing attacks, we verify the password even if the user doesn't exist. We use a dummy password for this purpose.
+        verify_password(password, DUMMY_HASH)  # Prevent timing attacks
         return None
-    
-    valid_password = verify_password(password, _get_user_password_hash(db_session, user.id))
-    if not valid_password:
+
+    credential = db_session.exec(
+        select(UserCredential).where(
+            UserCredential.user_id == user.id,
+            UserCredential.provider == "local",
+        )
+    ).first()
+
+    if not credential or not credential.password_hash:
+        logger.warning(f"Authentication failed for email {email}: no local credential found")
+        verify_password(password, DUMMY_HASH)  # Prevent timing attacks
+        return None
+
+    if not verify_password(password, credential.password_hash):
         logger.warning(f"Authentication failed for email {email}: invalid password")
         return None
-    
-    return user
 
-
-### Protected functions
-
-def _get_user_password_hash(db_session: Session, user_id: int) -> str:
-    """Get the hashed password for a user by ID. This is a protected function and should not be used outside of authentication logic."""
-    user = db_session.exec(select(User).where(User.id == user_id)).first()
-    if not user:
-        logger.error(f"User with ID {user_id} not found when trying to get password hash")
-        raise ValueError("User not found")
-    return user.hashed_password
+    return UserOut.model_validate(user)

@@ -1,21 +1,12 @@
-import jwt
-from jwt.exceptions import InvalidTokenError
-from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from pydantic import BaseModel
-from pwdlib import PasswordHash
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import (
-    OAuth2PasswordBearer,
-    OAuth2PasswordRequestForm,
-)
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 
-from src.schemas.common import Tags, Token
-from src.schemas.user import UserCreate, UserOut
-from src.services.auth import create_access_token
+from src.schemas.common import Tags
+from src.schemas.user import UserCreate, UserOut, LoginRequest
+from src.services.auth import create_access_token, token_required
 from src.services.user import create_user, authenticate_user
-from src.services.exceptions import UserAlreadyExsistsError
+from src.services.exceptions import UserAlreadyExistsError
 from src.database import SessionDep
 
 router = APIRouter(
@@ -23,10 +14,16 @@ router = APIRouter(
     tags=[Tags.auth],
 )
 
+@router.get("/status")
+async def auth_status(token_payload: Annotated[dict, Depends(token_required)]) -> dict[str, str | None]:
+    """Endpoint to check the authentication status of the current user."""
+    return {"email": token_payload.get("sub")}
+
+
 @router.post("/login")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db_session: SessionDep) -> Token:
+async def login(login_data: LoginRequest, db_session: SessionDep, response: Response) -> dict[str, str]:
     """Endpoint to authenticate (log in) a user and return an access token."""
-    user = authenticate_user(db_session, form_data.username, form_data.password)
+    user = authenticate_user(db_session, login_data.email, login_data.password)
 
     if not user:
         raise HTTPException(
@@ -40,7 +37,17 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db_s
         expiry=60  # Token expires in 60 minutes
     )
 
-    return Token(access_token=access_token, token_type="bearer")
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=60 * 60,  # Cookie expires in 1 hour
+        path="/"
+    )
+
+    return {"status": "success"}
 
 
 @router.post("/register_user")
@@ -49,10 +56,23 @@ async def register_user(user_data: UserCreate, db_session: SessionDep) -> UserOu
     
     try:
         user = create_user(db_session, user_data)
-    except UserAlreadyExsistsError as e:
+    except UserAlreadyExistsError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=str(e)
         )
     
     return user
+
+
+@router.post("/logout")
+async def logout(response: Response) -> dict[str, str]:
+    """Endpoint to log out a user by clearing the authentication cookie."""
+    response.delete_cookie(key="access_token", path="/")
+    return {"status": "success"}
+
+
+@router.get("/test_protected")
+async def test_protected_route(token_payload: Annotated[dict, Depends(token_required)]) -> dict:
+    """A protected endpoint that requires a valid access token to access."""
+    return {"message": "You have accessed a protected route!", "user": token_payload.get("sub")}
