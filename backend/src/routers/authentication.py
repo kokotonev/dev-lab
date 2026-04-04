@@ -1,10 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 
 from src.schemas.common import Tags
 from src.schemas.user import UserCreate, UserOut, LoginRequest
-from src.services.auth import create_access_token, token_required
+from src.services.auth import (
+    create_access_token, 
+    decode_access_token,
+    token_required, 
+    create_refresh_token, 
+    verify_and_rotate_refresh_token,
+    revoke_all_refresh_tokens_for_user,
+)
 from src.services.user import create_user, authenticate_user
 from src.services.exceptions import UserAlreadyExistsError
 from src.database import SessionDep
@@ -17,7 +24,58 @@ router = APIRouter(
 @router.get("/status")
 async def auth_status(token_payload: Annotated[dict, Depends(token_required)]) -> dict[str, str | None]:
     """Endpoint to check the authentication status of the current user."""
-    return {"email": token_payload.get("sub")}
+    return {"user_id": token_payload.get("sub")}
+
+
+@router.post("/refresh")
+async def refresh_access_token(request: Request, response: Response, db_session: SessionDep) -> dict[str, str]:
+    """Endpoint to refresh the access token using a valid refresh token."""
+    refresh_token = request.cookies.get("refresh_token")
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    user_id = verify_and_rotate_refresh_token(refresh_token, db_session)
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    new_access_token = create_access_token(
+        data={"sub": user_id},
+        expiry=15  # Token expires in 15 minutes
+    )
+
+    new_refresh_token = create_refresh_token(user_id, db_session)
+
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=15 * 60,  # Cookie expires in 15 minutes
+        path="/"
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=30 * 24 * 60 * 60,  # Cookie expires in 30 days
+        path="/auth/refresh"
+    )
+
+    return {"status": "success"}
 
 
 @router.post("/login")
@@ -33,9 +91,11 @@ async def login(login_data: LoginRequest, db_session: SessionDep, response: Resp
         )
 
     access_token = create_access_token(
-        data={"sub": user.email},
-        expiry=60  # Token expires in 60 minutes
+        data={"sub": user.id},
+        expiry=15  # Token expires in 15 minutes
     )
+
+    refresh_token = create_refresh_token(user.id, db_session)
 
     response.set_cookie(
         key="access_token",
@@ -43,8 +103,18 @@ async def login(login_data: LoginRequest, db_session: SessionDep, response: Resp
         httponly=True,
         secure=False,  # Set to True in production with HTTPS
         samesite="lax",
-        max_age=60 * 60,  # Cookie expires in 1 hour
+        max_age=15 * 60,  # Cookie expires in 15 minutes
         path="/"
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production with HTTPS
+        samesite="lax",
+        max_age=30 * 24 * 60 * 60,  # Cookie expires in 30 days
+        path="/auth/refresh"
     )
 
     return {"status": "success"}
@@ -66,9 +136,17 @@ async def register_user(user_data: UserCreate, db_session: SessionDep) -> UserOu
 
 
 @router.post("/logout")
-async def logout(response: Response) -> dict[str, str]:
+async def logout(request: Request, response: Response, db_session: SessionDep) -> dict[str, str]:
     """Endpoint to log out a user by clearing the authentication cookie."""
+    decoded = decode_access_token(request.cookies.get("access_token", ""))
+    if decoded:
+        user_id = decoded.get("sub")
+        if user_id:
+            # Revoke all refresh tokens for this user
+            revoke_all_refresh_tokens_for_user(user_id, db_session)
+
     response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/auth/refresh")
     return {"status": "success"}
 
 
