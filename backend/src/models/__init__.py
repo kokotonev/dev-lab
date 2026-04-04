@@ -4,3 +4,4 @@ By importing this module, you ensure that all models are registered with SQLMode
 Make sure to import all your models here, so they are included in the metadata and can be detected by Alembic when generating migrations.
 """
 from src.models.user import User, UserCredential
+from src.models.auth import RefreshToken
