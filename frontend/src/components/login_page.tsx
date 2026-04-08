@@ -8,7 +8,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
-    const { setUser } = useAuth();
+    const { setUserId } = useAuth();
 
     async function handleSubmit(e: { preventDefault(): void }) {
         e.preventDefault();
@@ -19,8 +19,8 @@ export default function LoginPage() {
                 method: "POST",
                 body: JSON.stringify({ email, password }),
             });
-            const user = await apiFetch("/auth/status");
-            setUser(user);
+            const data = await apiFetch("/auth/status");
+            setUserId(data.user_id);
             navigate("/dashboard");
         } catch (err) {
             setError((err as Error).message);

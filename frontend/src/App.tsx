@@ -6,21 +6,21 @@ import DashboardPage from './components/dashboard_page';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function ProtectedRoute() {
-  const { user, isLoading } = useAuth();
+  const { userId, isLoading } = useAuth();
   if (isLoading) return null;
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
+  return userId ? <Outlet /> : <Navigate to="/login" replace />;
 }
 
 function GuestOnlyRoute() {
-  const { user, isLoading } = useAuth();
+  const { userId, isLoading } = useAuth();
   if (isLoading) return null;
-  return user ? <Navigate to="/dashboard" replace /> : <Outlet />;
+  return userId ? <Navigate to="/dashboard" replace /> : <Outlet />;
 }
 
 function IndexRedirect() {
-  const { user, isLoading } = useAuth();
+  const { userId, isLoading } = useAuth();
   if (isLoading) return null;
-  return <Navigate to={user ? '/dashboard' : '/login'} replace />;
+  return <Navigate to={userId ? '/dashboard' : '/login'} replace />;
 }
 
 function Layout() {

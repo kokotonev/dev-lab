@@ -1,39 +1,33 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { apiFetch } from "../lib/api";
 
-interface User {
-    id: number;
-    email: string;
-    username: string | null;
-}
-
 interface AuthContextValue {
-    user: User | null;
+    userId: string | null;
     isLoading: boolean;
-    setUser: (user: User | null) => void;
+    setUserId: (userId: string | null) => void;
     logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         apiFetch("/auth/status")
-            .then(setUser)
-            .catch(() => setUser(null))
+            .then((data) => setUserId(data.user_id))
+            .catch(() => setUserId(null))
             .finally(() => setIsLoading(false));
     }, []);
 
     async function logout() {
         await apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
-        setUser(null);
+        setUserId(null);
     }
 
     return (
-        <AuthContext.Provider value={{ user, isLoading, setUser, logout }}>
+        <AuthContext.Provider value={{ userId, isLoading, setUserId, logout }}>
             {children}
         </AuthContext.Provider>
     );

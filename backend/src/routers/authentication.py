@@ -49,7 +49,7 @@ async def refresh_access_token(request: Request, response: Response, db_session:
         )
 
     new_access_token = create_access_token(
-        data={"sub": user_id},
+        data={"sub": str(user_id)},
         expiry=15  # Token expires in 15 minutes
     )
 
@@ -91,7 +91,7 @@ async def login(login_data: LoginRequest, db_session: SessionDep, response: Resp
         )
 
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},
         expiry=15  # Token expires in 15 minutes
     )
 
@@ -143,7 +143,7 @@ async def logout(request: Request, response: Response, db_session: SessionDep) -
         user_id = decoded.get("sub")
         if user_id:
             # Revoke all refresh tokens for this user
-            revoke_all_refresh_tokens_for_user(user_id, db_session)
+            revoke_all_refresh_tokens_for_user(int(user_id), db_session)
 
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key="refresh_token", path="/auth/refresh")

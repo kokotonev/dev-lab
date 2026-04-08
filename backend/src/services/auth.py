@@ -57,7 +57,7 @@ def verify_and_rotate_refresh_token(raw_token: str, db_session: Session) -> int 
     token_hash = hash_refresh_token(raw_token)
     db_token = db_session.exec(select(RefreshToken).where(RefreshToken.token_hash == token_hash)).first()
 
-    if not db_token or db_token.revoked_at is not None or db_token.expires_at < datetime.now(timezone.utc):
+    if not db_token or db_token.revoked_at is not None or db_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
         logger.warning("Invalid, revoked, or expired refresh token")
         return None
     
