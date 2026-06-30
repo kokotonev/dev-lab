@@ -37,29 +37,6 @@ class Teams(BaseModel):
     teams: list[TeamInfo]
 
 
-@router.post("/ask_teams")
-async def ask_teams(message: Annotated[str, Body(embed=True)]):
-    teams_conversation_history.append({"role": "user", "content": message})
-    
-    response = anthropic_client.messages.parse(
-        model="claude-sonnet-4-6",
-        max_tokens=1024,
-        system="You are a helpful assistant that provides concise answers to user questions.",
-        messages=teams_conversation_history,
-        output_format=Teams,
-    )
-
-    logger.info(f"----> Response from Anthropic: {response}")
-
-    teams_conversation_history.append({"role": "assistant", "content": response.content[0].text if response.content and response.content[0].type == "text" else ""})
-
-    # text_blocks = [block.text for block in response.content if block.type == "text"]
-    # return {"response": text_blocks[0]}
-
-    return response.parsed_output
-
-    # return {team.team_name: team.number_of_championships for team in response.parsed_output.teams if team.number_of_championships > 5}
-
 @router.get("/get_conversation")
 async def get_conversation(token_payload: Annotated[dict, Depends(token_required)], db_session: SessionDep):
     """
