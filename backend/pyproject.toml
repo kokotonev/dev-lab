@@ -9,6 +9,7 @@ dependencies = [
     "sqlmodel",
     "psycopg[binary]",
     "alembic",
+    "anthropic",
 ]
 
 [tool.fastapi]

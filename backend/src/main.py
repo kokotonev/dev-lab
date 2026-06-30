@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.routers import authentication
+from src.routers import authentication, agent_interaction
 from src.services.exceptions import TokenValidationError
 
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +41,7 @@ async def token_validation_error_handler(request: Request, exc: TokenValidationE
     )
 
 app.include_router(authentication.router)
+app.include_router(agent_interaction.router)
 
 @app.get("/liveness")
 async def liveness() -> dict[str, str]:

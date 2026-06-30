@@ -5,3 +5,4 @@ Make sure to import all your models here, so they are included in the metadata a
 """
 from src.models.user import User, UserCredential
 from src.models.auth import RefreshToken
+from src.models.chat import Conversation, Message
