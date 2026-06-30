@@ -31,6 +31,7 @@ A FastAPI service built around two routers:
   - `/ask` — conversational chat (authenticated): messages are **persisted to the database** and the full history is replayed to the model on every turn
   - `/get_conversation` — fetch the authenticated user's stored conversation history
   - `/clear_conversation` — wipe the authenticated user's conversation
+  - `/schedule_meeting` — an oversimplified **tool-use** demo: a single message is sent to Claude, which can call calendar tools (`create_calendar_event`, `list_calendar_events`). The endpoint runs the full tool-use loop — feeding each tool result back to the model until `stop_reason` is `end_turn` — and returns Claude's final natural-language reply. Currently, the tools are stubs (they log and return canned results) rather than a real calendar integration. Also, there is no front-end interface for it, so it has to be called from Postman or similar.
 
   Chat history is modelled with `Conversation` and `Message` tables; for now each user has a single conversation, with room to grow into multiple titled threads. A `handle_response` helper inspects the API `stop_reason` (`end_turn`, `max_tokens`, `tool_use`, refusals, …) so tool-use and other flows can be wired in later.
 
